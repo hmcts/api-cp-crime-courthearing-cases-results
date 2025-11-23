@@ -141,6 +141,39 @@ After receiving an event, the consumer (RaSS) will:
 `GET /cases/{case_id}/results/{result_event_type}`
 3.	Follow the URL to obtain a signed URL for the PDF warrant document.
 
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Consumer as RaSS (Prison Service)
+    participant Broker as Notification Channel (Topic/Queue)
+    participant AMP as API Marketplace
+    participant CP as Common Platform (Producer)
+    participant DocStore as HMCTS Document Store
+
+    Note over CP,AMP: Custody-Relevant Event Produced
+    CP->>AMP: Publish Result Event<br/>(custody-relevant)
+
+    AMP->>Broker: Push event to subscribed topic/queue
+
+    Note over Broker,Consumer: Event Delivery
+    Broker-->>Consumer: Deliver result event notification<br/>(asynchronous)
+
+    Note over Consumer: Consumer Pull Model Begins
+
+    Consumer->>AMP: GET /cases/{caseId}/results/{eventType}<br/>(request event metadata)
+    AMP-->>Consumer: 200 OK<br/>{result metadata + document pointer}
+
+    Consumer->>AMP: GET /cases/{caseId}/results/{eventType}/document<br/>(request signed URL)
+    AMP-->>Consumer: 200 OK<br/>{signedDocumentUrl}
+
+    Note over Consumer,DocStore: Document Retrieval
+    Consumer->>DocStore: GET {signedDocumentUrl}
+    DocStore-->>Consumer: 200 OK<br/>PDF Warrant
+
+    Note over Consumer: Consumer stores PDF locally<br/>(S3 or equivalent)
+```
+
 Future enhancements will expand JSON payload richness so prisons rely less on PDFs.
 
 **Important Note:**
@@ -153,6 +186,38 @@ Until the operational process changes, this must remain part of the producer–c
 * API returns metadata and a signed URL for the PDF.
 * HMCTS document storage remains the source of truth.
 * Prisons will store a local copy (AWS S3) to support their workflow automation.
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Consumer as RaSS (Prison Service)
+    participant AMP as API Marketplace
+    participant DocStore as HMCTS Document Store
+    participant LocalStore as RaSS S3 Storage
+
+    Note over Consumer,AMP: Consumer requests document metadata
+
+    Consumer->>AMP: GET /cases/{caseId}/results/{eventType}
+    AMP-->>Consumer: 200 OK<br/>{result metadata + document pointer}
+
+    Note over Consumer,AMP: Request signed URL
+
+    Consumer->>AMP: GET /documents/{documentId}/signed-url
+    AMP-->>Consumer: 200 OK<br/>{signedDocumentUrl}
+
+    Note over Consumer,DocStore: Retrieve actual PDF
+
+    Consumer->>DocStore: GET {signedDocumentUrl}
+    DocStore-->>Consumer: 200 OK<br/>PDF Document Stream
+
+    Note over Consumer,LocalStore: Store locally for workflow automation
+
+    Consumer->>LocalStore: PUT /warrants/{documentId}.pdf<br/>(store PDF)
+    LocalStore-->>Consumer: 200 OK
+
+    Note over Consumer: Consumer local system now has<br/>a durable copy for automations and movement workflows
+```
 
 **Benefits**
 
@@ -181,6 +246,49 @@ Delivery Guarantees
 `POST /cases/results/subscriptions/{subscriptionId}/events/replay`
 
 This strictly aligns replay with the subscription that owns the events.
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant AMP as API Marketplace
+    participant Broker as Notification Channel
+    participant Consumer as RaSS (Prison Service)
+    participant DLQ as Dead-Letter Queue
+
+    Note over AMP,Broker: Event Published
+
+    AMP->>Broker: Publish custody-relevant event
+    Broker->>Consumer: Deliver event notification
+
+    alt Consumer Unavailable or Delivery Failure
+        Consumer--x Broker: Delivery fails
+        Broker->>Broker: Retry with exponential backoff
+        Broker--x Consumer: Retry attempt<br/>(still failing)
+
+        Note over Broker,DLQ: Event moved to DLQ after final retry
+
+        Broker->>DLQ: Move undeliverable event
+    else Delivery Successful
+        Consumer-->>Broker: 200 OK<br/>(event accepted)
+    end
+
+    Note over Consumer,DLQ: DLQ Inspection
+
+    Consumer->>AMP: GET /cases/results/subscriptions/{subscriptionId}/events
+    AMP->>DLQ: Retrieve DLQ events
+    DLQ-->>AMP: Return stored failed events
+    AMP-->>Consumer: 200 OK<br/>{events[]}
+
+    Note over Consumer,DLQ: DLQ Replay
+
+    Consumer->>AMP: POST /cases/results/subscriptions/{subscriptionId}/events/replay
+    AMP->>DLQ: Retrieve events for replay
+    DLQ-->>AMP: Return DLQ events
+    AMP->>Broker: Resubmit events to correct topic/queue
+    Broker->>Consumer: Redeliver events
+    Consumer-->>Broker: 200 OK<br/>(event processed successfully)
+```
 
 ## Event Filtering Requirements
 
@@ -222,11 +330,7 @@ The new system must:
 
 ## Next Steps
 
-* Finalise event schema for MVP
 * Align subscription model with API Marketplace standards
 * Define authentication model for all consumer but initially for RaSS (temporary → long-term OAuth2)
-* Produce sequence diagrams for:
-  * Event publication
-  * Document retrieval
-  * DLQ replay
 * Produce OpenAPI v1.0 draft
+  * Including event schema for MVP
