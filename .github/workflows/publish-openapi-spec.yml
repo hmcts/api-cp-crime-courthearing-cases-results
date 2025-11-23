@@ -1,0 +1,98 @@
+name: Publish OpenAPI Spec to APIHub
+
+on:
+  workflow_call:
+    secrets:
+      SWAGGERHUB_API_KEY:
+        required: true
+    inputs:
+      upload_artifact_name:
+        required: true
+        type: string
+      apihub_owner:
+        required: true
+        type: string
+      api_name:
+        required: true
+        type: string
+      api_version:
+        required: true
+        type: string
+      is_release:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  Push-API-to-APIHub:
+    runs-on: ubuntu-latest
+    env:
+      SWAGGERHUB_API_KEY: ${{ secrets.SWAGGERHUB_API_KEY }}
+    steps:
+      - name: Download versioned OpenAPI spec
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.upload_artifact_name }}
+          path: ./${{ inputs.api_version }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+
+      - name: Install SwaggerHub CLI
+        run: npm install -g swaggerhub-cli
+
+      - name: Set CLI_API_REF env var
+        env:
+          APIHUB_OWNER: ${{ inputs.apihub_owner }}
+          API_NAME: ${{ inputs.api_name }}
+          API_VERSION: ${{ inputs.api_version }}
+        run: |
+          echo "CLI_API_REF=${APIHUB_OWNER}/${API_NAME}/${API_VERSION}" >> "$GITHUB_ENV"
+          echo "Using CLI_API_REF=${CLI_API_REF}"
+
+      - name: Find OpenAPI file
+        id: find_spec
+        run: |
+          FILE=$(find ./${{ inputs.api_version }} -type f -name "*.yml" | head -n 1)
+          echo "openapi_spec_file=$FILE" >> "$GITHUB_OUTPUT"
+
+      # https://github.com/SmartBear/swaggerhub-cli?tab=readme-ov-file#swaggerhub-apicreate
+      - name: Push API definition into API Hub
+        env:
+          OPENAPI_SPEC_FILE: ${{ steps.find_spec.outputs.openapi_spec_file }}
+        run: |
+          if [[ "${{ inputs.is_release }}" == "true" ]]; then
+            echo "PUBLIC: Publishing the RELEASED API to SwaggerHub"
+            swaggerhub api:create "${CLI_API_REF}" --file "${OPENAPI_SPEC_FILE}" --published publish --visibility public
+          else
+            echo "PRIVATE: Publishing the DRAFT API to SwaggerHub"
+            swaggerhub api:create "${CLI_API_REF}" --file "${OPENAPI_SPEC_FILE}" --visibility private
+          fi
+
+      # https://github.com/SmartBear/swaggerhub-cli?tab=readme-ov-file#swaggerhub-apiget
+      - name: Check the API definition exists
+        run: |
+          set -o pipefail
+          if ! swaggerhub api:get "${CLI_API_REF}" 2>&1 | tee error.log; then
+            echo "❌ API definition was not found on APIHub"
+            echo "--- CLI Error Output ---"
+            cat error.log
+            exit 1
+          fi
+
+      # https://github.com/SmartBear/swaggerhub-cli?tab=readme-ov-file#swaggerhub-apivalidate
+      - name: Validate definition
+        run: |
+          set -o pipefail
+          if ! swaggerhub api:validate "${CLI_API_REF}" 2>&1 | tee error.log; then
+            echo "❌ OpenAPI definition failed validation"
+            echo "--- CLI Error Output ---"
+            cat error.log
+            exit 1
+          fi
+
+        # https://github.com/SmartBear/swaggerhub-cli?tab=readme-ov-file#swaggerhub-apisetdefault
+      - name: Set released version to the default API Definition
+        if: inputs.is_release
+        run: |
+          swaggerhub api:setdefault "${CLI_API_REF}"

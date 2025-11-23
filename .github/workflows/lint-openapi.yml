@@ -1,0 +1,106 @@
+name: Linting of OpenAPI documents on Pull Requests
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  validate-openapi-links:
+    runs-on: ubuntu-latest
+    env:
+      FILE_PATH_OPENAPI: "src/main/resources/openapi"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Find OpenAPI file
+        id: find_spec
+        run: |
+          FILE=$(find ${FILE_PATH_OPENAPI} -name "*.openapi.yml" | head -n 1)
+          echo "openapi_file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Assert disallowed URLs are not present
+        run: |
+          DISALLOWED_DOMAINS="cjscp\.org\.uk|service\.gov\.uk|justice\.gov\.uk|hmcts\.net|ejudiciary\.net"
+          if grep -E "$DISALLOWED_DOMAINS" "${{ steps.find_spec.outputs.openapi_file }}"; then
+            echo "❌ Error: Found disallowed internal URLs in OpenAPI spec."
+            exit 1
+          else
+            echo "✅ No disallowed internal URLs found."
+          fi
+
+  json-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - run: npm install -g jsonlint
+
+      - name: Lint JSON schema example responses
+        run: |
+          shopt -s globstar nullglob
+          files=$(find src/main/resources/openapi/schema -name "*.json" ! -name "*.example.json")
+          if [ -z "$files" ]; then
+            echo "✅ No example JSON files to lint."
+          else
+            for file in $files; do
+              echo "Linting $file"
+              jsonlint -q "$file" || exit 1
+            done
+          fi
+
+  json-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - run: npm install ajv ajv-formats ajv-keywords
+
+      - name: Validate JSON schema responses
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/hmcts/api-cp-code-style/refs/heads/main/lint/scripts/ajv-validate.js -o ajv-validate.js
+
+          for schemaFile in $(find src/main/resources/openapi -name "*.json" ! -name "*.example.json"); do
+            datafile="${schemaFile/.json/.example.json}"
+            echo "datafile=$datafile"
+
+            if [ -f "$datafile" ]; then
+              echo "Validating $datafile against schema $schemaFile"
+              node ajv-validate.js "$schemaFile" "$datafile" || exit 1
+            else
+              echo "⚠️ Skipping: no example file found for $schemaFile"
+            fi
+          done
+
+  spectral-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - run: npm install -g @stoplight/spectral-cli
+
+      - name: Run Spectral on API specs
+        run: |
+          spectral lint "src/main/resources/openapi/*.{yml,yaml}" || exit 1

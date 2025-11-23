@@ -1,0 +1,83 @@
+openapi: 3.0.0
+servers:
+  - description: APIHub API Auto Mocking court-hearing-cases
+    url: https://virtserver.swaggerhub.com/HMCTS-DTS/api-hmcts-marketplace-template/0.0.0
+
+info:
+  title: Common Platform API
+  description: API description
+  version: 0.0.0
+  contact:
+    email: no-reply@hmcts.com
+  license:
+    name: MIT
+    url: 'https://opensource.org/licenses/MIT'
+
+paths:
+  /results:
+    get:
+      description: Retrieve results
+      operationId: getResults
+      tags:
+        - Cases
+      responses:
+        '200':
+          description: Results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        '404':
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '400':
+          description: bad input parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    Response:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Result"
+
+    Result:
+      type: object
+      title: Result
+      description: Result
+      properties:
+        resultText:
+          type: string
+          title: Result
+          description: Result
+          example: "This is result"
+      additionalProperties: false
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error context
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+          description: Unique identifier for error tracing

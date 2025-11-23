@@ -1,0 +1,148 @@
+name: Build and Publish (DRAFT CANDIDATE VERSION)
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+
+env:
+  FILE_PATH_OPENAPI: "src/main/resources/openapi"
+
+jobs:
+  Artefact-Version:
+    runs-on: ubuntu-latest
+    outputs:
+      artefact_version: ${{ steps.artefact.outputs.draft_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Necessary to fetch all history for accurate versioning
+
+      - name: Generate Artefact Version
+        id: artefact
+        uses: hmcts/artefact-version-action@v1
+        with:
+          release: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  Update-Spec-Version:
+    needs: [Artefact-Version]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    outputs:
+      upload_artifact_name: ${{ steps.update_spec.outputs.upload_artifact_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Update OpenAPI Spec Version
+        id: update_spec
+        uses: hmcts/update-openapi-version@main
+        with:
+          openapi_path: ${{ env.FILE_PATH_OPENAPI }}
+          api_name: ${{ github.event.repository.name }}
+          api_version: ${{ needs.Artefact-Version.outputs.artefact_version }}
+
+  Test:
+    name: Test - Java ${{ matrix.java }}
+    strategy:
+      matrix:
+        java: [21, 23]
+    runs-on: ubuntu-latest
+    needs: [Artefact-Version, Update-Spec-Version]
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: current
+
+      - name: Download updated OpenAPI file
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.Update-Spec-Version.outputs.upload_artifact_name }}
+          path: ${{ env.FILE_PATH_OPENAPI }}
+
+      - name: Gradle Build
+        env:
+          ARTEFACT_VERSION: ${{ needs.Artefact-Version.outputs.artefact_version }}
+          JAVA_VERSION: ${{ matrix.java }}
+        run: |
+          echo "Building with ARTEFACT_VERSION=$ARTEFACT_VERSION using Java $JAVA_VERSION"
+          gradle build -DAPI_SPEC_VERSION=$ARTEFACT_VERSION
+
+  Push-Draft-OpenAPI-Spec:
+    if: github.event_name == 'push'
+    needs: [ Test ]
+    uses: ./.github/workflows/publish-openapi-spec.yml
+    secrets:
+      SWAGGERHUB_API_KEY: ${{ secrets.APIHUB_API_KEY }}
+    with:
+      upload_artifact_name: ${{ needs.Update-Spec-Version.outputs.upload_artifact_name }}
+      apihub_owner: ${{ vars.APIHUB_ORGANISATION }}
+      api_name: ${{ github.event.repository.name }}
+      api_version: ${{ needs.Artefact-Version.outputs.artefact_version }}
+
+  Publish:
+    name: Publish Artefact - Java ${{ matrix.java }}
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [Artefact-Version, Push-Draft-OpenAPI-Spec]
+    strategy:
+      matrix:
+        java: [21]
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Download updated OpenAPI file
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.Update-Spec-Version.outputs.upload_artifact_name }}
+          path: ${{ env.FILE_PATH_OPENAPI }}
+
+      - name: Gradle Publish
+        env:
+          ARTEFACT_VERSION: ${{ needs.Artefact-Version.outputs.artefact_version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZURE_DEVOPS_ARTIFACT_USERNAME: ${{ secrets.AZURE_DEVOPS_ARTIFACT_USERNAME }}
+          AZURE_DEVOPS_ARTIFACT_TOKEN: ${{ secrets.AZURE_DEVOPS_ARTIFACT_TOKEN }}
+          JAVA_VERSION: ${{ matrix.java }}
+        run: |
+          echo "Publishing artefact for ARTEFACT_VERSION=$ARTEFACT_VERSION using Java $JAVA_VERSION"
+          
+          gradle build -x test publish \
+            -DAPI_SPEC_VERSION=$ARTEFACT_VERSION \
+            -DGITHUB_REPOSITORY=${{ github.repository }} \
+            -DGITHUB_ACTOR=${{ github.actor }} \
+            -DGITHUB_TOKEN=$GITHUB_TOKEN \
+            -DAZURE_DEVOPS_ARTIFACT_USERNAME=$AZURE_DEVOPS_ARTIFACT_USERNAME \
+            -DAZURE_DEVOPS_ARTIFACT_TOKEN=$AZURE_DEVOPS_ARTIFACT_TOKEN

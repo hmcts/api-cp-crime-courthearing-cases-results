@@ -1,0 +1,32 @@
+.gradle
+/build/
+gradle/wrapper
+gradlew
+gradlew.bat
+*.class
+bin
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+/out
+*.iws
+*.iml
+*.ipr
+node_modules
+package.json
+package-lock.json
+
+*.log
+
+.DS_Store
+*/.DS_Store
+
+/*report.html
