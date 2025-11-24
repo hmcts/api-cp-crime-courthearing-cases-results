@@ -36,7 +36,7 @@ jobs:
           path: ./${{ inputs.api_version }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
 
       - name: Install SwaggerHub CLI
         run: npm install -g swaggerhub-cli
