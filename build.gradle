@@ -19,20 +19,6 @@ def azureADOArtifactRepository = 'https://pkgs.dev.azure.com/hmcts/Artifacts/_pa
 def azureADOArtifactActor = System.getenv("AZURE_DEVOPS_ARTIFACT_USERNAME")
 def azureADOArtifactToken = System.getenv("AZURE_DEVOPS_ARTIFACT_TOKEN")
 
-
-//debugging
-//    if (githubActor != null) {
-//      println "🔐 Configuring GitHub Packages publishing to: https://maven.pkg.github.com/$githubRepo"
-//    }
-//    println "GitHub Packages publishing required environment variables:"
-//    println " - GITHUB_ACTOR=${githubActor != null ? ' ✔ FOUND' : '❌'}"
-//    println " - GITHUB_TOKEN=${githubToken != null ? ' ✔ FOUND' : '❌'}"
-//    println " - GITHUB_REPOSITORY=${githubRepo != null ? ' ✔ FOUND' : '❌'}"
-
-//    println "Azure ADO publishing required environment variables:"
-//    println " - AZURE_DEVOPS_ARTIFACT_USERNAME=${azureADOArtifactActor != null ? ' ✔ FOUND' : '❌'}"
-//    println " - AZURE_DEVOPS_ARTIFACT_TOKEN=${azureADOArtifactToken != null ? ' ✔ FOUND' : '❌'}"
-
 java {
     def javaVersion = JavaVersion.toVersion(System.getProperty("java.version"))
     sourceCompatibility = javaVersion
