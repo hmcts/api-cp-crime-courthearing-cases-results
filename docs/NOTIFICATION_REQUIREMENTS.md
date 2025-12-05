@@ -31,15 +31,13 @@ including Releases in Error — and provides a modern, event-driven foundation f
 
 Email delivery will run in parallel during early adoption to minimise operational risk during transition.
 
-## Functional Requirements
+## Event-Based Subscription and Publishing Model
 
-### Event-Based Notification Model
+The API must support a subscription-based event model where consumers can register to receive custody-relevant result events via webhooks.
 
-HMCTS must publish case result events whenever:
+HMCTS must publish result events whenever:
 * A new custodial outcome occurs.
 * An amended custodial result is recorded (treated identically to “create”).
-
-## Subscription
 
 ### Subscription Registration
 
@@ -166,6 +164,68 @@ sequenceDiagram
     
     APIM-->>Webhook: Consumer: Deliver result event<br/>(asynchronously)
 ```
+
+## Authentication
+
+### API Authentication
+
+All API requests require authentication using OAuth 2.0 client credentials flow:
+
+1. **Client Registration**: Common Platform registers the consumer application (e.g., RaSS) in Microsoft Entra ID and provides the client ID and secret
+2. **Token Acquisition**: Clients obtain an access token from Common Platform Microsoft Entra ID using their client ID and secret
+3. **Token Usage**: Include the access token in the `Authorization` header as a Bearer token
+4. **Token Refresh**: Tokens have a limited lifetime; clients must refresh before expiry
+
+### Token Validation
+
+API Management (Gateway) validates all incoming tokens using the built-in `validate-jwt` policy before forwarding requests to backend services. Validation is performed locally using cached public keys from Microsoft Entra ID (JWKS endpoint):
+
+1. **Signature Verification**: Validates the token signature against cached Microsoft Entra ID public keys
+2. **Expiry Check**: Rejects expired tokens (validates `exp` claim)
+3. **Issuer Validation**: Confirms the `iss` claim matches Common Platform Microsoft Entra ID tenant
+4. **Audience Validation**: Confirms the `aud` claim matches this API's application ID
+
+Invalid tokens are rejected with HTTP 401 Unauthorized.
+
+**APIM Policy Example:**
+```xml
+<inbound>
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401">
+        <openid-config url="https://login.microsoftonline.com/{tenant-id}/v2.0/.well-known/openid-configuration" />
+        <audiences>
+            <audience>{api-application-id}</audience>
+        </audiences>
+        <issuers>
+            <issuer>https://login.microsoftonline.com/{tenant-id}/v2.0</issuer>
+        </issuers>
+    </validate-jwt>
+</inbound>
+```
+
+### Webhook Authentication
+
+When delivering events to consumer webhook endpoints (e.g., RaSS), Common Platform must authenticate using the mechanism specified by HMPPS. See: https://ministryofjustice.github.io/hmpps-integration-api/authentication.html
+
+HMPPS requires two complementary authentication methods:
+
+1. **Mutual TLS (mTLS)**: Common Platform must present a TLS certificate issued by HMPPS when making webhook requests
+2. **API Key**: Include an `x-api-key` HTTP header containing the API key provided by HMPPS (not Base64 encoded)
+
+**Setup Process:**
+1. HMPPS issues a TLS certificate and API key to Common Platform
+2. Common Platform stores these credentials securely (e.g., Azure Key Vault)
+3. When delivering webhook events, Common Platform presents the TLS certificate and includes the API key header
+
+**Security Requirements:**
+- All communication over TLS 1.2 or higher
+- Credentials must be stored securely (e.g., Azure Key Vault)
+- Rotate credentials periodically
+- Log authentication failures for security monitoring
+
+
+# *******************************************************************
+# TODO: THE BELOW IS A SEPARATE API DEFINITION - MOVE TO CORRECT REPO
+# *******************************************************************
 
 
 ### Document Retrieval Process
@@ -346,62 +406,5 @@ The new system must:
 * Produce OpenAPI v1.0 draft
   * Including event schema for MVP
 
-## Authentication
 
-### API Authentication
-
-All API requests require authentication using OAuth 2.0 client credentials flow:
-
-1. **Client Registration**: Common Platform registers the consumer application (e.g., RaSS) in Microsoft Entra ID and provides the client ID and secret
-2. **Token Acquisition**: Clients obtain an access token from Common Platform Microsoft Entra ID using their client ID and secret
-3. **Token Usage**: Include the access token in the `Authorization` header as a Bearer token
-4. **Token Refresh**: Tokens have a limited lifetime; clients must refresh before expiry
-
-### Token Validation
-
-API Management (Gateway) validates all incoming tokens using the built-in `validate-jwt` policy before forwarding requests to backend services. Validation is performed locally using cached public keys from Microsoft Entra ID (JWKS endpoint):
-
-1. **Signature Verification**: Validates the token signature against cached Microsoft Entra ID public keys
-2. **Expiry Check**: Rejects expired tokens (validates `exp` claim)
-3. **Issuer Validation**: Confirms the `iss` claim matches Common Platform Microsoft Entra ID tenant
-4. **Audience Validation**: Confirms the `aud` claim matches this API's application ID
-
-Invalid tokens are rejected with HTTP 401 Unauthorized.
-
-**APIM Policy Example:**
-```xml
-<inbound>
-    <validate-jwt header-name="Authorization" failed-validation-httpcode="401">
-        <openid-config url="https://login.microsoftonline.com/{tenant-id}/v2.0/.well-known/openid-configuration" />
-        <audiences>
-            <audience>{api-application-id}</audience>
-        </audiences>
-        <issuers>
-            <issuer>https://login.microsoftonline.com/{tenant-id}/v2.0</issuer>
-        </issuers>
-    </validate-jwt>
-</inbound>
-```
-
-
-
-### Webhook Authentication
-
-When delivering events to consumer webhook endpoints (e.g., RaSS), Common Platform must authenticate using the mechanism specified by HMPPS. See: https://ministryofjustice.github.io/hmpps-integration-api/authentication.html
-
-HMPPS requires two complementary authentication methods:
-
-1. **Mutual TLS (mTLS)**: Common Platform must present a TLS certificate issued by HMPPS when making webhook requests
-2. **API Key**: Include an `x-api-key` HTTP header containing the API key provided by HMPPS (not Base64 encoded)
-
-**Setup Process:**
-1. HMPPS issues a TLS certificate and API key to Common Platform
-2. Common Platform stores these credentials securely (e.g., Azure Key Vault)
-3. When delivering webhook events, Common Platform presents the TLS certificate and includes the API key header
-
-**Security Requirements:**
-- All communication over TLS 1.2 or higher
-- Credentials must be stored securely (e.g., Azure Key Vault)
-- Rotate credentials periodically
-- Log authentication failures for security monitoring
 
