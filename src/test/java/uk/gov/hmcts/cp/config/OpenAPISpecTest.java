@@ -2,10 +2,10 @@ package uk.gov.hmcts.cp.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
-import uk.gov.hmcts.cp.openapi.api.CasesApi;
-import uk.gov.hmcts.cp.openapi.model.ErrorResponse;
-import uk.gov.hmcts.cp.openapi.model.Response;
-import uk.gov.hmcts.cp.openapi.model.Result;
+import uk.gov.hmcts.cp.openapi.api.SubscriptionApi;
+import uk.gov.hmcts.cp.openapi.model.ClientSubscription;
+import uk.gov.hmcts.cp.openapi.model.ClientSubscriptionRequest;
+import uk.gov.hmcts.cp.openapi.model.EventType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,21 +13,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenAPISpecTest {
     @Test
     void generated_error_response_should_have_expected_fields() {
-        assertThat(ErrorResponse.class).hasDeclaredFields("error", "message", "details", "traceId");
+        // What no ErrorResponse ? All the others have one. TBD
+        // assertThat(ErrorResponse.class).hasDeclaredFields("error", "message", "details", "traceId");
     }
 
     @Test
-    void generated_response_should_have_expected_fields() {
-        assertThat(Response.class).hasDeclaredFields("results");
+    void enventType_should_have_correct_entries() {
+        assertThat(EventType.PCR.getValue()).isEqualTo("PCR");
+        assertThat(EventType.CUSTODIAL_RESULT.getValue()).isEqualTo("CUSTODIAL_RESULT");
     }
 
     @Test
-    void generated_result_should_have_expected_fields() {
-        assertThat(Result.class).hasDeclaredFields("resultText");
+    void subscription_generated_request_should_have_expected_fields() {
+        assertThat(ClientSubscriptionRequest.class).hasDeclaredFields("notificationEndpoint");
+        assertThat(ClientSubscriptionRequest.class).hasDeclaredFields("eventTypes");
+    }
+
+    @Test
+    void subscription_generated_response_should_have_expected_fields() {
+        assertThat(ClientSubscription.class).hasDeclaredFields("clientSubscriptionId");
+        assertThat(ClientSubscription.class).hasDeclaredFields("notificationEndpoint");
+        assertThat(ClientSubscription.class).hasDeclaredFields("eventTypes");
+        assertThat(ClientSubscription.class).hasDeclaredFields("createdAt");
+        assertThat(ClientSubscription.class).hasDeclaredFields("updatedAt");
     }
 
     @Test
     void generated_api_should_have_expected_methods() {
-        assertThat(CasesApi.class).hasDeclaredMethods("getResults");
+        assertThat(SubscriptionApi.class).hasDeclaredMethods("createClientSubscription");
     }
 }

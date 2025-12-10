@@ -1,83 +1,257 @@
-openapi: 3.0.0
-servers:
-  - description: APIHub API Auto Mocking court-hearing-cases
-    url: https://virtserver.swaggerhub.com/HMCTS-DTS/api-hmcts-marketplace-template/0.0.0
+openapi: 3.1.0
 
 info:
-  title: Common Platform API
-  description: API description
-  version: 0.0.0
-  contact:
-    email: no-reply@hmcts.com
-  license:
-    name: MIT
-    url: 'https://opensource.org/licenses/MIT'
+  title: Client Subscriptions API
+  version: 1.0.0
+  description: API for managing client subscriptions as standalone resources.
+
+servers:
+  - url: https://api.example.com
+
+security:
+  - bearerAuth: []
 
 paths:
-  /results:
-    get:
-      description: Retrieve results
-      operationId: getResults
+  /clientSubscriptions:
+    post:
+      summary: Create a new client subscription
+      operationId: createClientSubscription
       tags:
-        - Cases
+        - Subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              createSubscription:
+                summary: Example subscription creation request
+                value:
+                  notificationEndpoint:
+                    webhookUrl: "https://client.example.com/events"
+                  eventTypes: ["PCR", "CUSTODIAL_RESULT"]
+            schema:
+              $ref: '#/components/schemas/ClientSubscriptionRequest'
+      responses:
+        '201':
+          description: Subscription created
+          content:
+            application/json:
+              examples:
+                createdSubscription:
+                  summary: Example subscription creation response
+                  value:
+                    clientSubscriptionId: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+                    notificationEndpoint:
+                      webhookUrl: "https://client.example.com/events"
+                    eventTypes: ["PCR", "CUSTODIAL_RESULT"]
+                    createdAt: "2025-01-01T10:00:00Z"
+                    updatedAt: null
+              schema:
+                $ref: '#/components/schemas/ClientSubscription'
+
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              examples:
+                invalidPayload:
+                  value:
+                    error: "invalid_request"
+                    message: "eventTypes must contain at least one value."
+
+        '401':
+          description: Unauthorized
+
+
+  /clientSubscriptions/{clientSubscriptionId}:
+    get:
+      summary: Retrieve a client subscription by ID
+      operationId: getClientSubscription
+      tags:
+        - Subscription
+      parameters:
+        - name: clientSubscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
       responses:
         '200':
-          description: Results
+          description: Subscription object
           content:
             application/json:
+              examples:
+                subscription:
+                  value:
+                    clientSubscriptionId: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+                    notificationEndpoint:
+                      webhookUrl: "https://client.example.com/events"
+                    eventTypes: ["PCR"]
+                    createdAt: "2025-01-01T10:00:00Z"
+                    updatedAt: "2025-01-05T17:30:00Z"
               schema:
-                $ref: "#/components/schemas/Response"
+                $ref: '#/components/schemas/ClientSubscription'
+
         '404':
-          description: Case not found
+          description: Subscription not found
           content:
             application/json:
+              examples:
+                notFound:
+                  value:
+                    error: "not_found"
+                    message: "No subscription exists for ID aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44."
+
+        '401':
+          description: Unauthorized
+
+
+    put:
+      summary: Strict update of a client subscription
+      description: Caller must supply *all* updatable fields.
+      operationId: updateClientSubscription
+      tags:
+        - Subscription
+      parameters:
+        - name: clientSubscriptionId
+          in: path
+          required: true
+          example: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              updateSubscription:
+                summary: Example update request
+                value:
+                  notificationEndpoint:
+                    webhookUrl: "https://client.example.com/new-hook"
+                  eventTypes: ["CUSTODIAL_RESULT"]
+            schema:
+              $ref: '#/components/schemas/ClientSubscriptionRequest'
+      responses:
+        '200':
+          description: Subscription updated
+          content:
+            application/json:
+              examples:
+                updatedSubscription:
+                  value:
+                    clientSubscriptionId: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+                    notificationEndpoint:
+                      webhookUrl: "https://client.example.com/new-hook"
+                    eventTypes: ["CUSTODIAL_RESULT"]
+                    createdAt: "2025-01-01T10:00:00Z"
+                    updatedAt: "2025-01-10T09:15:00Z"
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ClientSubscription'
+
         '400':
-          description: bad input parameter
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          description: Invalid request
+
+        '404':
+          description: Subscription not found
+
+        '401':
+          description: Unauthorized
+
+
+    delete:
+      summary: Delete a subscription by ID
+      operationId: deleteClientSubscription
+      tags:
+        - Subscription
+      parameters:
+        - name: clientSubscriptionId
+          in: path
+          required: true
+          example: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Deleted successfully
+
+        '404':
+          description: Subscription not found
+
+        '401':
+          description: Unauthorized
+
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
-    Response:
+    EventType:
+      type: string
+      enum:
+        - PCR
+        - CUSTODIAL_RESULT
+      example: PCR
+
+    NotificationEndpoint:
       type: object
+      required:
+        - webhookUrl
       properties:
-        results:
+        webhookUrl:
+          type: string
+          format: uri
+          pattern: '^https://.*$'
+          example: "https://client.example.com/events"
+
+    ClientSubscriptionRequest:
+      type: object
+      required:
+        - notificationEndpoint
+        - eventTypes
+      properties:
+        notificationEndpoint:
+          $ref: '#/components/schemas/NotificationEndpoint'
+        eventTypes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/EventType'
+          example: ["PCR", "CUSTODIAL_RESULT"]
+
+    ClientSubscription:
+      type: object
+      required:
+        - clientSubscriptionId
+        - notificationEndpoint
+        - eventTypes
+        - createdAt
+      properties:
+        clientSubscriptionId:
+          type: string
+          format: uuid
+          example: "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+        notificationEndpoint:
+          $ref: '#/components/schemas/NotificationEndpoint'
+        eventTypes:
           type: array
           items:
-            $ref: "#/components/schemas/Result"
-
-    Result:
-      type: object
-      title: Result
-      description: Result
-      properties:
-        resultText:
-          type: string
-          title: Result
-          description: Result
-          example: "This is result"
-      additionalProperties: false
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          description: Machine-readable error code
-        message:
-          type: string
-          description: Human-readable error message
-        details:
-          type: object
-          additionalProperties: true
-          description: Additional error context
-        timestamp:
+            $ref: '#/components/schemas/EventType'
+          example: ["PCR"]
+        createdAt:
           type: string
           format: date-time
-        traceId:
+          example: "2025-01-01T10:00:00Z"
+        updatedAt:
           type: string
-          description: Unique identifier for error tracing
+          format: date-time
+          nullable: true
+          example: "2025-01-02T15:45:00Z"
