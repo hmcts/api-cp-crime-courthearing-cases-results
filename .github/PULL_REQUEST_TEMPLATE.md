@@ -1,23 +1,12 @@
-**Before creating a pull request make sure that:**
+Title: <type>: [jira-ticket] <description>
 
-- [ ] commit messages are meaningful and follow good commit message guidelines
-- [ ] README and other documentation has been updated / added (if needed)
-- [ ] tests have been updated / new tests has been added (if needed)
+**Related Issue:**
+[Jira description with issue number](link to jira issue)
+for e.g
+[AMP-152 - Publish Open API spec to API Hub](https://tools.hmcts.net/jira/browse/AMP-152)
 
-Please remove this line and everything above and fill the following sections:
+### Summary
+- Bullet point summary of changes
+- Any other useful information that can be provided
 
-
-### JIRA link (if applicable) ###
-
-
-
-### Change description ###
-
-
-
-**Does this PR introduce a breaking change?** (check one with "x")
-
-```
-[ ] Yes
-[ ] No
-```
+Refer to https://tools.hmcts.net/confluence/spaces/AMP/pages/1923487086/Git+practices

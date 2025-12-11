@@ -6,7 +6,10 @@ info:
   version: 1.0.0
   license:
     name: MIT
-    url: 'https://opensource.org/licenses/MIT'
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: HMCTS API Marketplace
+    email: no-reply@hmcts.com
 
 
 servers:
@@ -19,6 +22,7 @@ paths:
   /clientSubscriptions:
     post:
       summary: Create a new client subscription
+      description: Creates a new client subscription with the specified notification endpoint and event types.
       operationId: createClientSubscription
       tags:
         - Subscription
@@ -70,6 +74,7 @@ paths:
   /clientSubscriptions/{clientSubscriptionId}:
     get:
       summary: Retrieve a client subscription by ID
+      description: Returns the subscription matching the given clientSubscriptionId.
       operationId: getClientSubscription
       tags:
         - Subscription
@@ -168,6 +173,7 @@ paths:
 
     delete:
       summary: Delete a subscription by ID
+      description: Deletes the subscription identified by clientSubscriptionId.
       operationId: deleteClientSubscription
       tags:
         - Subscription
