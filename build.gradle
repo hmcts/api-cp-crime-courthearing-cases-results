@@ -13,38 +13,22 @@ group = 'uk.gov.hmcts.cp'
 version = System.getProperty('API_SPEC_VERSION') ?: '0.0.999'
 
 apply {
-  from("$rootDir/gradle/repositories.gradle")
-  from("$rootDir/gradle/java.gradle")
-  from("$rootDir/gradle/dependency.gradle")
-  from("$rootDir/gradle/pmd.gradle")
-  from("$rootDir/gradle/test.gradle")
-  from("$rootDir/gradle/openapi.gradle")
-  from("$rootDir/gradle/jar.gradle")
-}
+  from("$rootDir/gradle/dependencies/java-core.gradle")
+  from("$rootDir/gradle/dependencies/spring-boot-core.gradle")
 
-ext {
-  springBootVersion = "4.0.0"
-  lombokVersion = "1.18.38"
+  from("$rootDir/gradle/github/repositories.gradle")
+  from("$rootDir/gradle/github/dependency.gradle")
+  from("$rootDir/gradle/github/pmd.gradle")
+  from("$rootDir/gradle/github/test.gradle")
+  from("$rootDir/gradle/github/openapi.gradle")
+  from("$rootDir/gradle/github/jar.gradle")
 }
 
 dependencies {
-  implementation 'org.openapitools:openapi-generator-core:7.17.0'
-  implementation 'io.swagger.parser.v3:swagger-parser:2.1.36'
+  compileOnly 'org.openapitools:openapi-generator-core:7.17.0'
+  compileOnly 'io.swagger.parser.v3:swagger-parser:2.1.36'
+
+  // See docs/DEPENDENCIES.md that explains why we have JUST ONE implementation / published dependency
+  // The rest are not included in published dependencies
   implementation 'io.swagger.core.v3:swagger-annotations:2.2.41'
-  implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
-
-  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.20'
-  implementation "org.springframework.boot:spring-boot-starter-web:$springBootVersion"
-  implementation "org.springframework.boot:spring-boot-starter-validation:$springBootVersion"
-  testImplementation "org.springframework.boot:spring-boot-starter-test:$springBootVersion"
-
-  compileOnly group: 'org.projectlombok', name: 'lombok', version: lombokVersion
-  testCompileOnly group: 'org.projectlombok', name: 'lombok', version: lombokVersion
-  annotationProcessor group: 'org.projectlombok', name: 'lombok', version: lombokVersion
-  testAnnotationProcessor group: 'org.projectlombok', name: 'lombok', version: lombokVersion
-
-  testImplementation(platform('org.junit:junit-bom:6.0.1'))
-  testImplementation 'org.junit.jupiter:junit-jupiter-api'
-  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
-  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

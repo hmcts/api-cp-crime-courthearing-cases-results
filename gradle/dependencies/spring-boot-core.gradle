@@ -1,0 +1,11 @@
+ext {
+  springBootVersion = "4.0.0"
+}
+
+dependencies {
+  compileOnly "org.springframework.boot:spring-boot-starter-web:$springBootVersion"
+  testImplementation "org.springframework.boot:spring-boot-starter-web:$springBootVersion"
+  compileOnly "org.springframework.boot:spring-boot-starter-validation:$springBootVersion"
+  testImplementation "org.springframework.boot:spring-boot-starter-validation:$springBootVersion"
+  testImplementation "org.springframework.boot:spring-boot-starter-test:$springBootVersion"
+}
