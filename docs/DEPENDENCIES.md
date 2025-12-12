@@ -16,7 +16,7 @@ reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode n
 
 This is the only dependency that we want to expose to the consuming client
 
-Any other dependencies that we need for build, we set as compileOnly to ensue the consuming client does not pull them in
+Any other dependencies that we need for build, we set as compileOnly to ensure the consuming client does not pull them in
 which may cause conflicts 
 
 ## Debugging dependencies Locally
@@ -38,6 +38,7 @@ gradle generatePomFileForMavenJavaPublication
 This will create a pom file such as
 ./build/publications/mavenJava/pom-default.xml
 This can be converted to a gradle file and imported directly into the consuming service to pull in dependencies directly
+This may help local testing of any conflicts
 Convert pom to gradle at site such as https://sagioto.github.io/maven2gradle/
 
 i.e. build.gradle may pull in the local jarfile and dependencies
